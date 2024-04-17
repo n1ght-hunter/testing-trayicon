@@ -1,42 +1,29 @@
+mod window;
+
 use iced_core::window::Icon;
-use std::{ffi::OsStr, mem, os::windows::ffi::OsStrExt, ptr};
+use window::window_proc;
+use std::{ffi::OsStr, mem, ops::Deref, os::windows::ffi::OsStrExt, ptr};
 
 use windows_sys::Win32::{
     Foundation::{HMODULE, HWND, LPARAM, LRESULT, POINT, WPARAM},
     System::LibraryLoader::GetModuleHandleW,
     UI::{
         Shell::{
-            Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_MODIFY, NOTIFYICONDATAW,
+            Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NIM_MODIFY,
+            NOTIFYICONDATAW,
         },
         WindowsAndMessaging::{
-            CreateIcon, CreatePopupMenu, CreateWindowExW, DefWindowProcW, GetCursorPos, LoadIconW, PostQuitMessage,
-            RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetMenuInfo,
-            CW_USEDEFAULT, HICON, HMENU, IDI_APPLICATION,
-            MENUINFO, MIM_APPLYTOSUBMENUS, MIM_STYLE, MNS_NOTIFYBYPOS, WM_CREATE, WM_DESTROY, WM_LBUTTONUP, WM_MENUCOMMAND,
-            WM_RBUTTONUP, WM_USER, WNDCLASSW, WS_OVERLAPPEDWINDOW,
+            CreateIcon, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DispatchMessageW,
+            GetCursorPos, GetMessageW, LoadIconW, PostMessageW, PostQuitMessage, RegisterClassW,
+            RegisterWindowMessageW, SetForegroundWindow, SetMenuInfo, TranslateMessage,
+            CW_USEDEFAULT, HICON, IDI_APPLICATION, MENUINFO, MIM_APPLYTOSUBMENUS, MIM_STYLE,
+            MNS_NOTIFYBYPOS, MSG, WM_CREATE, WM_DESTROY, WM_LBUTTONDBLCLK, WM_LBUTTONUP,
+            WM_MBUTTONDBLCLK, WM_MBUTTONUP, WM_MENUCOMMAND, WM_MOUSEMOVE, WM_QUIT,
+            WM_RBUTTONDBLCLK, WM_RBUTTONUP, WM_USER, WM_XBUTTONDBLCLK, WM_XBUTTONUP, WNDCLASSW,
+            WS_OVERLAPPEDWINDOW,
         },
     },
 };
-
-fn main() {
-    let image = image::open("assets/rustacean.png").unwrap().into_rgba8();
-    let (width, height) = image.dimensions();
-    let container = image.into_raw();
-    let icon = iced_core::window::icon::from_rgba(container, width, height).unwrap();
-    let window_info = unsafe { init_window() }.unwrap();
-
-    window_info.set_tooltip("Hello, World!").unwrap();
-    window_info.set_icon(icon).unwrap();
-
-    loop {}
-}
-
-#[derive(Clone)]
-pub struct WindowInfo {
-    pub hwnd: HWND,
-    pub hmodule: HMODULE,
-    pub hmenu: HMENU,
-}
 
 #[repr(C)]
 #[derive(Debug)]
@@ -55,7 +42,17 @@ impl Pixel {
 
 const PIXEL_SIZE: usize = std::mem::size_of::<Pixel>();
 
-impl WindowInfo {
+#[derive(Clone)]
+pub struct WindowsIconHandler(HWND);
+
+impl WindowsIconHandler {
+    pub fn new() -> Result<WindowsIconHandler, ()> {
+        unsafe { init_window(None) }
+    }
+    pub fn wiht_parent(parent_hwnd: HWND) -> Result<WindowsIconHandler, ()> {
+        unsafe { init_window(Some(parent_hwnd)) }
+    }
+
     pub fn set_icon(&self, icon: Icon) -> Result<(), &'static str> {
         let (rgba, size) = icon.into_raw();
         let pixel_count = rgba.len() / PIXEL_SIZE;
@@ -90,7 +87,7 @@ impl WindowInfo {
     fn _set_icon(&self, icon: HICON) -> Result<(), &'static str> {
         let mut icon_data = unsafe { mem::zeroed::<NOTIFYICONDATAW>() };
         icon_data.cbSize = mem::size_of::<NOTIFYICONDATAW>() as u32;
-        icon_data.hWnd = self.hwnd;
+        icon_data.hWnd = **self;
         icon_data.uID = 1;
         icon_data.uFlags = NIF_ICON;
         icon_data.hIcon = icon;
@@ -111,7 +108,7 @@ impl WindowInfo {
 
         let mut nid = unsafe { mem::zeroed::<NOTIFYICONDATAW>() };
         nid.cbSize = mem::size_of::<NOTIFYICONDATAW>() as u32;
-        nid.hWnd = self.hwnd;
+        nid.hWnd = **self;
         nid.uID = 1;
         nid.uFlags = NIF_TIP;
 
@@ -134,8 +131,16 @@ impl WindowInfo {
     }
 }
 
-unsafe impl Send for WindowInfo {}
-unsafe impl Sync for WindowInfo {}
+unsafe impl Send for WindowsIconHandler {}
+unsafe impl Sync for WindowsIconHandler {}
+
+impl Deref for WindowsIconHandler {
+    type Target = HWND;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 pub(crate) fn to_wstring(str: &str) -> Vec<u16> {
     OsStr::new(str)
@@ -144,7 +149,23 @@ pub(crate) fn to_wstring(str: &str) -> Vec<u16> {
         .collect::<Vec<_>>()
 }
 
-pub(crate) unsafe fn init_window() -> Result<WindowInfo, ()> {
+pub(crate) unsafe fn run_loop() {
+    // Run message loop
+    let mut msg = unsafe { mem::zeroed::<MSG>() };
+    loop {
+        GetMessageW(&mut msg, 0, 0, 0);
+        if msg.message == WM_QUIT {
+            break;
+        }
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+}
+
+
+
+
+pub unsafe fn init_window(parent_hwnd: Option<HWND>) -> Result<WindowsIconHandler, ()> {
     let hmodule = GetModuleHandleW(ptr::null());
     if hmodule == 0 {
         return Err(());
@@ -167,7 +188,7 @@ pub(crate) unsafe fn init_window() -> Result<WindowInfo, ()> {
         0,
         CW_USEDEFAULT,
         0,
-        0,
+        parent_hwnd.unwrap_or(0) as HWND,
         0,
         0,
         ptr::null(),
@@ -215,95 +236,5 @@ pub(crate) unsafe fn init_window() -> Result<WindowInfo, ()> {
         return Err(());
     }
 
-    Ok(WindowInfo {
-        hwnd,
-        hmenu,
-        hmodule,
-    })
-}
-
-pub(crate) unsafe extern "system" fn window_proc(
-    h_wnd: HWND,
-    msg: u32,
-    w_param: WPARAM,
-    l_param: LPARAM,
-) -> LRESULT {
-    static mut U_TASKBAR_RESTART: u32 = 0;
-
-    if msg == WM_MENUCOMMAND {
-        // WININFO_STASH.with(|stash| {
-        //     let stash = stash.borrow();
-        //     let stash = stash.as_ref();
-        //     if let Some(stash) = stash {
-        //         let menu_id = GetMenuItemID(stash.info.hmenu, w_param as i32) as i32;
-        //         if menu_id != -1 {
-        //             stash.tx.send(WindowsTrayEvent(menu_id as u32)).ok();
-        //         }
-        //     }
-        // });
-    }
-
-    if msg == WM_USER + 1 && (l_param as u32 == WM_LBUTTONUP || l_param as u32 == WM_RBUTTONUP) {
-        let mut point = POINT { x: 0, y: 0 };
-        if GetCursorPos(&mut point) == 0 {
-            return 1;
-        }
-
-        SetForegroundWindow(h_wnd);
-
-        // WININFO_STASH.with(|stash| {
-        //     let stash = stash.borrow();
-        //     let stash = stash.as_ref();
-        //     if let Some(stash) = stash {
-        //         TrackPopupMenu(
-        //             stash.info.hmenu,
-        //             TPM_LEFTBUTTON | TPM_BOTTOMALIGN | TPM_LEFTALIGN,
-        //             point.x,
-        //             point.y,
-        //             0,
-        //             h_wnd,
-        //             ptr::null(),
-        //         );
-        //     }
-        // });
-    }
-
-    if msg == WM_CREATE {
-        U_TASKBAR_RESTART = RegisterWindowMessageW(to_wstring("TaskbarCreated").as_ptr());
-    }
-
-    // If windows explorer restarts and we need to recreate the tray icon
-    if msg == U_TASKBAR_RESTART {
-        let icon: HICON = unsafe {
-            let mut handle = LoadIconW(
-                GetModuleHandleW(std::ptr::null()),
-                to_wstring("tray-default").as_ptr(),
-            );
-            if handle == 0 {
-                handle = LoadIconW(0, IDI_APPLICATION);
-            }
-            if handle == 0 {
-                println!("Error setting icon from resource");
-                PostQuitMessage(0);
-            }
-            handle as HICON
-        };
-        let mut nid = unsafe { mem::zeroed::<NOTIFYICONDATAW>() };
-        nid.cbSize = mem::size_of::<NOTIFYICONDATAW>() as u32;
-        nid.hWnd = h_wnd;
-        nid.uID = 1;
-        nid.uFlags = NIF_MESSAGE | NIF_ICON;
-        nid.hIcon = icon;
-        nid.uCallbackMessage = WM_USER + 1;
-        if Shell_NotifyIconW(NIM_ADD, &nid) == 0 {
-            println!("Error adding menu icon");
-            PostQuitMessage(0);
-        }
-    }
-
-    if msg == WM_DESTROY {
-        PostQuitMessage(0);
-    }
-
-    DefWindowProcW(h_wnd, msg, w_param, l_param)
+    Ok(WindowsIconHandler(hwnd))
 }
