@@ -540,12 +540,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glam"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
-
-[[package]]
 name = "half"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -572,23 +566,6 @@ name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
-
-[[package]]
-name = "iced_core"
-version = "0.12.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d7e6bbd197f311ed3d8b71651876b0ce01318fde52cda862a9a7a4373c9b930"
-dependencies = [
- "bitflags 2.5.0",
- "glam",
- "log",
- "num-traits",
- "raw-window-handle",
- "smol_str",
- "thiserror",
- "web-time",
- "xxhash-rust",
-]
 
 [[package]]
 name = "icrate"
@@ -1453,10 +1430,8 @@ checksum = "e1fc403891a21bcfb7c37834ba66a547a8f402146eba7265b5a6d88059c9ff2f"
 name = "testing_trayicon"
 version = "0.1.0"
 dependencies = [
- "iced_core",
  "image",
- "once_cell",
- "windows-sys 0.52.0",
+ "winit",
 ]
 
 [[package]]
@@ -2117,16 +2092,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "winit-example"
-version = "0.1.0"
-dependencies = [
- "iced_core",
- "image",
- "testing_trayicon",
- "winit",
-]
-
-[[package]]
 name = "winnow"
 version = "0.5.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2200,12 +2165,6 @@ name = "xkeysym"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "054a8e68b76250b253f671d1268cb7f1ae089ec35e195b2efb2a4e9a836d0621"
-
-[[package]]
-name = "xxhash-rust"
-version = "0.8.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "927da81e25be1e1a2901d59b81b37dd2efd1fc9c9345a55007f09bf5a2d3ee03"
 
 [[package]]
 name = "zerocopy"

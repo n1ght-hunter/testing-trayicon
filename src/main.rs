@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Position},
     error::EventLoopError,
@@ -10,8 +8,6 @@ use winit::{
     tray::{Tray, TrayBuilder},
     window::{Icon, Window, WindowBuilder, WindowId},
 };
-
-use testing_trayicon::WindowsIconHandler;
 
 fn main() -> Result<(), impl std::error::Error> {
     let event_loop = EventLoop::new().unwrap();
